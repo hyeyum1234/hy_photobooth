@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resultCanvas.height = PHOTO_H * TOTAL + GAP * (TOTAL + 1) + BOTTOM;
 
   let photos = [];
-  let photoImages = []; // ✅ 버그1 수정: 미리 로드된 Image 객체 보관
+  let photoImages = [];
   let selectedFrame = null;
   let bgColor = "#ffffff";
   let count = 0;
@@ -46,14 +46,56 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentFacingMode = "user";
   let selectedStickerIndex = null;
 
-  // 더블탭/더블클릭 감지용
   let lastTapTime = 0;
   let lastTapX = 0;
   let lastTapY = 0;
   let clickTimer = null;
 
-  const shutterSound = new Audio(shutterSoundFile);
-  shutterSound.load();
+  // ✅ 셔터음 수정: AudioContext로 더 안정적으로 처리
+  let audioContext = null;
+  let shutterBuffer = null;
+
+  async function loadShutterSound() {
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const response = await fetch(shutterSoundFile);
+      const arrayBuffer = await response.arrayBuffer();
+      shutterBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    } catch(e) {
+      // AudioContext 실패 시 Audio 태그로 폴백
+      console.warn("AudioContext 실패, Audio 태그로 대체:", e);
+    }
+  }
+
+  function playShutter() {
+    try {
+      if (audioContext && shutterBuffer) {
+        // AudioContext가 suspended 상태면 resume
+        if (audioContext.state === "suspended") {
+          audioContext.resume();
+        }
+        const source = audioContext.createBufferSource();
+        source.buffer = shutterBuffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+      } else {
+        // 폴백: Audio 태그 방식
+        const fallback = new Audio(shutterSoundFile);
+        fallback.play().catch(() => {});
+      }
+    } catch(e) {}
+  }
+
+  // 사용자 첫 인터랙션 시 AudioContext 활성화 (브라우저 정책)
+  function resumeAudio() {
+    if (audioContext && audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+  }
+  document.addEventListener("click", resumeAudio, { once: false });
+  document.addEventListener("touchstart", resumeAudio, { once: false });
+
+  loadShutterSound();
 
   const text1 = document.getElementById("text1");
   const text2 = document.getElementById("text2");
@@ -65,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   setTodayDate();
 
-  // ✅ 버그3 수정: 폰트 미리 로드 후 시작
+  // 폰트 미리 로드
   async function loadFont() {
     try {
       await document.fonts.load("26px Gaegu");
@@ -165,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
     placeStickerAt(draggedSticker, canvasX, canvasY);
   });
 
-  // ✅ 버그2 수정: PC 더블클릭 삭제 / 모바일 더블탭 삭제
+  // 캔버스 클릭/탭
   resultCanvas.addEventListener("click", (e) => {
     const { canvasX, canvasY } = getCanvasCoords(e.clientX, e.clientY);
 
@@ -189,7 +231,6 @@ document.addEventListener("DOMContentLoaded", () => {
         placeStickerAt(availableStickers[selectedStickerIndex], canvasX, canvasY);
       }
     } else {
-      // PC: 더블클릭 감지
       if (clickTimer) {
         clearTimeout(clickTimer);
         clickTimer = null;
@@ -255,15 +296,18 @@ document.addEventListener("DOMContentLoaded", () => {
     redraw();
     countTimer = setInterval(() => {
       count--;
-      if (count === 1) { shutterSound.currentTime = 0; shutterSound.play().catch(() => {}); }
+
       if (count <= 0) {
         clearInterval(countTimer);
         count = 0;
+
+        // ✅ 셔터음: 찍히는 순간에 재생 (가장 안정적인 타이밍)
+        playShutter();
+
         canvas.width = PHOTO_W;
         canvas.height = PHOTO_H;
         canvas.getContext("2d").drawImage(video, 0, 0, PHOTO_W, PHOTO_H);
 
-        // ✅ 버그1 수정: Image 객체로 미리 로드 후 저장 → 깜빡임 없음
         const dataURL = canvas.toDataURL();
         const img = new Image();
         img.onload = () => {
@@ -287,7 +331,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const dy = GAP + i * (PHOTO_H + GAP);
 
       if (photoImages[i]) {
-        // ✅ 버그1 수정: 미리 로드된 Image 객체 사용
         ctx.drawImage(photoImages[i], dx, dy, PHOTO_W, PHOTO_H);
       } else if (i === photos.length && video.srcObject) {
         ctx.drawImage(video, dx, dy, PHOTO_W, PHOTO_H);
@@ -311,7 +354,6 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.drawImage(selectedFrame, (resultCanvas.width - selectedFrame.width) / 2, (resultCanvas.height - selectedFrame.height) / 2);
     }
 
-    // ✅ 버그3 수정: cursive 폴백 추가
     ctx.fillStyle = "#000";
     ctx.textAlign = "center";
     ctx.font = "26px Gaegu, cursive";
@@ -353,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (countTimer) clearInterval(countTimer);
     } else if (photos.length > 0) {
       photos.pop();
-      photoImages.pop(); // ✅ 버그1 수정: 같이 제거
+      photoImages.pop();
     }
     redraw();
   };
@@ -361,7 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
   clearPhotosBtn.onclick = () => {
     if (confirm("찍은 사진들만 모두 지울까요? (스티커는 유지됩니다)")) {
       photos = [];
-      photoImages = []; // ✅ 버그1 수정: 같이 초기화
+      photoImages = [];
       count = 0;
       if (countTimer) clearInterval(countTimer);
       redraw();
@@ -371,7 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resetAllBtn.onclick = () => {
     if (confirm("모든 설정(사진, 스티커, 프레임, 문구 등)을 초기화할까요?")) {
       photos = [];
-      photoImages = []; // ✅ 버그1 수정: 같이 초기화
+      photoImages = [];
       placedStickers = [[], [], [], []];
       selectedFrame = null;
       bgColor = "#ffffff";
