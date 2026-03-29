@@ -1,11 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
   // --- [설정 영역] ---
-  const frameSources = ["frame1.png", "frame2.png", "frame3.png", "frame4.png", "frame5.png", "frame6.png", "frame7.png", "frame8.png"];
+  const frameSources = ["frame1.png","frame2.png","frame3.png","frame4.png","frame5.png","frame6.png","frame7.png","frame8.png"];
   const stickerSources = ["sticker1.png","sticker2.png","sticker3.png","sticker4.png","sticker6.png","sticker7.png","sticker8.png","sticker9.png","sticker10.png","sticker11.png","sticker12.png","sticker13.png","sticker14.png","sticker15.png","sticker16.png","sticker17.png","sticker18.png","sticker19.png","sticker20.png","sticker21.png","sticker22.png"];
   const shutterSoundFile = "shutter.mp3";
   // ------------------
 
-  // 모바일 감지 (터치 기기 여부)
+  // 모바일 감지
   const isMobile = () => window.matchMedia("(pointer: coarse)").matches;
 
   const video = document.createElement("video");
@@ -19,12 +19,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const startBtn = document.getElementById("floatingStartBtn");
   const captureBtn = document.getElementById("floatingCaptureBtn");
   const flipBtn = document.getElementById("flipBtn");
-
   const saveBtn = document.getElementById("saveBtn");
   const undoBtn = document.getElementById("undoBtn");
   const clearPhotosBtn = document.getElementById("clearPhotosBtn");
   const resetAllBtn = document.getElementById("resetAllBtn");
-
   const cameraControls = document.getElementById("cameraControls");
 
   const PHOTO_W = 300;
@@ -38,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resultCanvas.height = PHOTO_H * TOTAL + GAP * (TOTAL + 1) + BOTTOM;
 
   let photos = [];
+  let photoImages = []; // ✅ 버그1 수정: 미리 로드된 Image 객체 보관
   let selectedFrame = null;
   let bgColor = "#ffffff";
   let count = 0;
@@ -45,14 +44,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const availableStickers = [];
   let placedStickers = [[], [], [], []];
   let currentFacingMode = "user";
-
-  // 모바일 스티커 선택 상태
   let selectedStickerIndex = null;
 
-  // 더블탭 감지용
+  // 더블탭/더블클릭 감지용
   let lastTapTime = 0;
   let lastTapX = 0;
   let lastTapY = 0;
+  let clickTimer = null;
 
   const shutterSound = new Audio(shutterSoundFile);
   shutterSound.load();
@@ -66,6 +64,16 @@ document.addEventListener("DOMContentLoaded", () => {
     dateInput.value = today.getFullYear() + "." + String(today.getMonth()+1).padStart(2,"0") + "." + String(today.getDate()).padStart(2,"0");
   };
   setTodayDate();
+
+  // ✅ 버그3 수정: 폰트 미리 로드 후 시작
+  async function loadFont() {
+    try {
+      await document.fonts.load("26px Gaegu");
+      await document.fonts.load("bold 100px Gaegu");
+      await document.fonts.load("20px Gaegu");
+    } catch(e) {}
+  }
+  loadFont().then(() => redraw());
 
   async function startCamera(facingMode) {
     if (video.srcObject) {
@@ -103,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 스티커 로드
   stickerSources.forEach((src, index) => {
-    if (!src) return; // undefined 방어
+    if (!src) return;
     const img = new Image();
     img.src = src;
     img.onload = () => {
@@ -113,14 +121,11 @@ document.addEventListener("DOMContentLoaded", () => {
       thumb.className = "sticker-thumb";
 
       if (isMobile()) {
-        // ── 모바일: 탭으로 선택 ──
         thumb.addEventListener("click", () => {
           if (selectedStickerIndex === index) {
-            // 같은 스티커 다시 탭 → 선택 취소
             selectedStickerIndex = null;
             thumb.classList.remove("sticker-selected");
           } else {
-            // 다른 스티커 탭 → 이전 선택 해제 후 새로 선택
             selectedStickerIndex = index;
             document.querySelectorAll(".sticker-thumb").forEach(el => el.classList.remove("sticker-selected"));
             thumb.classList.add("sticker-selected");
@@ -128,7 +133,6 @@ document.addEventListener("DOMContentLoaded", () => {
           updateStickerHint();
         });
       } else {
-        // ── PC: 드래그앤드롭 ──
         thumb.draggable = true;
         thumb.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", index));
       }
@@ -137,13 +141,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   });
 
-  // 모바일 힌트 메시지
   function updateStickerHint() {
     let hint = document.getElementById("stickerHint");
     if (!hint) {
       hint = document.createElement("div");
       hint.id = "stickerHint";
-      hint.style.cssText = "text-align:center; font-size:15px; color:#ff6b9d; margin:6px 0; font-family:Gaegu;";
+      hint.style.cssText = "text-align:center;font-size:15px;color:#ff6b9d;margin:6px 0;font-family:Gaegu;";
       document.getElementById("stickerSelection").after(hint);
     }
     hint.textContent = selectedStickerIndex !== null
@@ -151,18 +154,18 @@ document.addEventListener("DOMContentLoaded", () => {
       : "";
   }
 
-  // ── PC: 드래그앤드롭 ──
+  // PC: 드래그앤드롭
   resultCanvas.addEventListener("dragover", (e) => e.preventDefault());
   resultCanvas.addEventListener("drop", (e) => {
     e.preventDefault();
-    const stickerIdx = e.dataTransfer.getData("text/plain");
-    const draggedSticker = availableStickers[parseInt(stickerIdx)];
+    const stickerIdx = parseInt(e.dataTransfer.getData("text/plain"));
+    const draggedSticker = availableStickers[stickerIdx];
     if (!draggedSticker) return;
     const { canvasX, canvasY } = getCanvasCoords(e.clientX, e.clientY);
     placeStickerAt(draggedSticker, canvasX, canvasY);
   });
 
-  // ── 캔버스 클릭/탭 이벤트 (PC 삭제 & 모바일 배치/더블탭 삭제) ──
+  // ✅ 버그2 수정: PC 더블클릭 삭제 / 모바일 더블탭 삭제
   resultCanvas.addEventListener("click", (e) => {
     const { canvasX, canvasY } = getCanvasCoords(e.clientX, e.clientY);
 
@@ -174,28 +177,31 @@ document.addEventListener("DOMContentLoaded", () => {
       const isDoubleTap = (now - lastTapTime < 350) && dist < 30;
 
       if (isDoubleTap) {
-        // 더블탭 → 스티커 삭제
         deleteStickerAt(canvasX, canvasY);
         lastTapTime = 0;
         return;
       }
-
       lastTapTime = now;
       lastTapX = canvasX;
       lastTapY = canvasY;
 
-      // 스티커가 선택된 상태면 해당 위치에 붙이기
       if (selectedStickerIndex !== null && availableStickers[selectedStickerIndex]) {
         placeStickerAt(availableStickers[selectedStickerIndex], canvasX, canvasY);
-        // 선택 유지 (연속으로 여러 개 붙일 수 있게)
       }
     } else {
-      // PC: 클릭으로 스티커 삭제
-      deleteStickerAt(canvasX, canvasY);
+      // PC: 더블클릭 감지
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        deleteStickerAt(canvasX, canvasY);
+      } else {
+        clickTimer = setTimeout(() => {
+          clickTimer = null;
+        }, 300);
+      }
     }
   });
 
-  // 캔버스 좌표 계산 헬퍼
   function getCanvasCoords(clientX, clientY) {
     const rect = resultCanvas.getBoundingClientRect();
     const scaleX = resultCanvas.width / rect.width;
@@ -206,7 +212,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // 스티커 배치 헬퍼
   function placeStickerAt(sticker, canvasX, canvasY) {
     for (let i = 0; i < TOTAL; i++) {
       const slotX = SIDE;
@@ -214,20 +219,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (canvasX >= slotX && canvasX <= slotX + PHOTO_W && canvasY >= slotY && canvasY <= slotY + PHOTO_H) {
         const sW = 100;
         const sH = (sticker.height / sticker.width) * sW;
-        placedStickers[i].push({
-          img: sticker,
-          x: canvasX - slotX - sW / 2,
-          y: canvasY - slotY - sH / 2,
-          w: sW,
-          h: sH
-        });
+        placedStickers[i].push({ img: sticker, x: canvasX - slotX - sW / 2, y: canvasY - slotY - sH / 2, w: sW, h: sH });
         redraw();
         break;
       }
     }
   }
 
-  // 스티커 삭제 헬퍼
   function deleteStickerAt(canvasX, canvasY) {
     for (let i = 0; i < TOTAL; i++) {
       const slotX = SIDE;
@@ -261,9 +259,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (count <= 0) {
         clearInterval(countTimer);
         count = 0;
-        canvas.width = PHOTO_W; canvas.height = PHOTO_H;
+        canvas.width = PHOTO_W;
+        canvas.height = PHOTO_H;
         canvas.getContext("2d").drawImage(video, 0, 0, PHOTO_W, PHOTO_H);
-        photos.push(canvas.toDataURL());
+
+        // ✅ 버그1 수정: Image 객체로 미리 로드 후 저장 → 깜빡임 없음
+        const dataURL = canvas.toDataURL();
+        const img = new Image();
+        img.onload = () => {
+          photoImages.push(img);
+          photos.push(dataURL);
+          redraw();
+        };
+        img.src = dataURL;
       }
       redraw();
     }, 1000);
@@ -277,21 +285,25 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 0; i < TOTAL; i++) {
       const dx = SIDE;
       const dy = GAP + i * (PHOTO_H + GAP);
-      if (photos[i]) {
-        const img = new Image();
-        img.src = photos[i];
-        ctx.drawImage(img, dx, dy, PHOTO_W, PHOTO_H);
+
+      if (photoImages[i]) {
+        // ✅ 버그1 수정: 미리 로드된 Image 객체 사용
+        ctx.drawImage(photoImages[i], dx, dy, PHOTO_W, PHOTO_H);
       } else if (i === photos.length && video.srcObject) {
         ctx.drawImage(video, dx, dy, PHOTO_W, PHOTO_H);
         if (count > 0) {
           ctx.fillStyle = "rgba(0,0,0,0.4)";
           ctx.fillRect(dx, dy, PHOTO_W, PHOTO_H);
-          ctx.fillStyle = "#fff"; ctx.font = "bold 100px Gaegu"; ctx.textAlign = "center";
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 100px Gaegu, cursive";
+          ctx.textAlign = "center";
           ctx.fillText(count, dx + PHOTO_W / 2, dy + PHOTO_H / 2 + 30);
         }
       } else {
-        ctx.fillStyle = "#eee"; ctx.fillRect(dx, dy, PHOTO_W, PHOTO_H);
+        ctx.fillStyle = "#eee";
+        ctx.fillRect(dx, dy, PHOTO_W, PHOTO_H);
       }
+
       placedStickers[i].forEach(s => ctx.drawImage(s.img, dx + s.x, dy + s.y, s.w, s.h));
     }
 
@@ -299,10 +311,14 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.drawImage(selectedFrame, (resultCanvas.width - selectedFrame.width) / 2, (resultCanvas.height - selectedFrame.height) / 2);
     }
 
-    ctx.fillStyle = "#000"; ctx.textAlign = "center"; ctx.font = "26px Gaegu";
+    // ✅ 버그3 수정: cursive 폴백 추가
+    ctx.fillStyle = "#000";
+    ctx.textAlign = "center";
+    ctx.font = "26px Gaegu, cursive";
     ctx.fillText(text1.value, resultCanvas.width / 2, resultCanvas.height - 180);
     ctx.fillText(text2.value, resultCanvas.width / 2, resultCanvas.height - 145);
-    ctx.font = "20px Gaegu"; ctx.fillText(dateInput.value, resultCanvas.width / 2, resultCanvas.height - 110);
+    ctx.font = "20px Gaegu, cursive";
+    ctx.fillText(dateInput.value, resultCanvas.width / 2, resultCanvas.height - 110);
 
     updateButtons();
     if (video.srcObject && photos.length < TOTAL) requestAnimationFrame(redraw);
@@ -324,7 +340,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 저장
   saveBtn.onclick = () => {
     const link = document.createElement("a");
     link.download = "hyeyum_photo.png";
@@ -332,31 +347,31 @@ document.addEventListener("DOMContentLoaded", () => {
     link.click();
   };
 
-  // 한 장 취소
   undoBtn.onclick = () => {
     if (count > 0) {
       count = 0;
       if (countTimer) clearInterval(countTimer);
     } else if (photos.length > 0) {
       photos.pop();
+      photoImages.pop(); // ✅ 버그1 수정: 같이 제거
     }
     redraw();
   };
 
-  // 사진만 비우기
   clearPhotosBtn.onclick = () => {
     if (confirm("찍은 사진들만 모두 지울까요? (스티커는 유지됩니다)")) {
       photos = [];
+      photoImages = []; // ✅ 버그1 수정: 같이 초기화
       count = 0;
       if (countTimer) clearInterval(countTimer);
       redraw();
     }
   };
 
-  // 전체 초기화
   resetAllBtn.onclick = () => {
     if (confirm("모든 설정(사진, 스티커, 프레임, 문구 등)을 초기화할까요?")) {
       photos = [];
+      photoImages = []; // ✅ 버그1 수정: 같이 초기화
       placedStickers = [[], [], [], []];
       selectedFrame = null;
       bgColor = "#ffffff";
@@ -374,7 +389,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  // 배경색 선택
   document.querySelectorAll("#colorPicker button").forEach(btn => {
     btn.onclick = () => {
       bgColor = btn.dataset.color;
