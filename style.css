@@ -1,0 +1,67 @@
+body {
+  font-family: 'Gaegu', cursive;
+  text-align: center;
+  background: linear-gradient(135deg, #fff0f5, #e0f7ff);
+  padding-bottom: 50px;
+}
+h2 { font-size: 32px; margin-bottom: 10px; }
+.title { font-size: 20px; margin: 20px 0 5px; font-weight: bold; color: #555; }
+
+/* 프레임 & 스티커 선택 */
+.frame-selection, .sticker-selection {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 10px; max-width: 800px; margin: 0 auto;
+}
+.frame-selection img {
+  width: 120px; height: 160px; cursor: pointer; border-radius: 12px; border: 3px solid transparent; background: white; object-fit: contain; transition: 0.2s;
+}
+.frame-selection img.selected { border-color: #ff9ecf; transform: scale(1.1); }
+
+.sticker-thumb {
+  width: 60px; height: 60px; cursor: grab; border-radius: 12px; border: 2px solid #eee; background: white; object-fit: contain;
+}
+
+.sticker-thumb.sticker-selected {
+  border: 3px solid #ff6b9d;
+  transform: scale(1.15);
+  box-shadow: 0 0 8px #ff9ecf;
+}
+/* 색상 선택기 */
+#colorPicker button {
+  width: 35px; height: 35px; border-radius: 50%; border: 3px solid transparent; margin: 4px; cursor: pointer;
+}
+#colorPicker button.selected { border: 3px solid #333; }
+
+/* 입력창 */
+input {
+  padding: 8px; border-radius: 10px; margin: 5px auto; font-family: 'Gaegu'; display: block; width: 250px; text-align: center; border: 1px solid #ddd;
+}
+
+/* ⭐ 상단 컨트롤 버튼 스타일 */
+.top-controls {
+  display: flex; justify-content: center; gap: 8px; margin: 25px auto 15px; flex-wrap: wrap; max-width: 500px;
+}
+.top-controls button {
+  font-family: 'Gaegu'; font-size: 16px; padding: 10px 14px; border-radius: 12px; border: none; cursor: pointer; color: white; box-shadow: 0 3px 6px rgba(0,0,0,0.1); transition: 0.2s;
+}
+.btn-save { background-color: #4361ee; }
+.btn-undo { background-color: #7209b7; }
+.btn-clear-photos { background-color: #ff9f1c; }
+.btn-reset-all { background-color: #ef476f; }
+.top-controls button:hover { opacity: 0.8; transform: translateY(-2px); }
+
+/* 카메라 컨트롤 */
+#cameraControls { display: flex; justify-content: center; gap: 15px; margin: 15px auto; }
+#flipBtn {
+  font-family: 'Gaegu'; font-size: 18px; padding: 10px 20px; border-radius: 50px; border: none; color: white; cursor: pointer; background: #a78bfa;
+}
+
+/* 캔버스 영역 */
+#canvasWrapper { position: relative; display: inline-block; margin-top: 10px; }
+#resultCanvas { display: block; border-radius: 25px; box-shadow: 0 5px 25px rgba(0,0,0,0.15); background: white; }
+
+/* 플로팅 버튼 */
+#floatingStartBtn, #floatingCaptureBtn {
+  position: absolute; width: 60px; height: 60px; border-radius: 50%; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+#floatingStartBtn { background: #6bc5ff; }
+#floatingCaptureBtn { background: #ff6b9d; }
