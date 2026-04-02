@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HY_photo_booth</title>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #ff6b9d;
+    --pink-light: #ffd1dc;
+    --blue: #4361ee;
+    --purple: #7209b7;
+    --orange: #ff9f1c;
+    --red: #ef476f;
+    --teal: #2ec4b6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Gaegu', cursive;
+    background: linear-gradient(135deg, #fff0f5, #e0f7ff);
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  header {
+    text-align: center;
+    padding: 20px 16px 0;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #333;
+  }
+
+  /* ── 스텝 인디케이터 ── */
+  .step-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 16px 10px;
+    flex-wrap: wrap;
+  }
+  .step-dot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .step-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #ddd; color: #999;
+    font-size: 14px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .3s; font-family: 'Gaegu', cursive;
+  }
+  .step-circle.active { background: var(--pink); color: white; box-shadow: 0 0 0 4px #ffd1dc; transform: scale(1.15); }
+  .step-circle.done   { background: var(--teal); color: white; }
+  .step-label { font-size: 11px; color: #aaa; white-space: nowrap; }
+  .step-label.active { color: var(--pink); font-weight: 700; }
+  .step-label.done   { color: var(--teal); }
+  .step-line { width: 24px; height: 2px; background: #ddd; margin-bottom: 18px; transition: background .3s; }
+  .step-line.done { background: var(--teal); }
+
+  /* ── 페이지 ── */
+  .page {
+    display: none; animation: fadeIn .35s ease;
+    max-width: 760px; margin: 0 auto; padding: 10px 16px 20px;
+  }
+  .page.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-title {
+    font-size: 22px; font-weight: 700;
+    color: #555; text-align: center; margin: 12px 0 14px;
+  }
+
+  .hint-box {
+    background: rgba(255,107,157,0.08);
+    border: 1.5px dashed var(--pink-light);
+    border-radius: 14px;
+    padding: 10px 16px;
+    text-align: center; font-size: 15px; color: #888; margin: 8px 0;
+  }
+
+  /* ── Step1: 프레임 + 배경색 통합 레이아웃 ── */
+  .step1-layout {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+
+  /* 왼쪽: 프레임 썸네일 + 배경색 선택 묶음 */
+  .step1-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    max-width: 480px;
+  }
+
+  /* 썸네일 목록 */
+  .frame-selection {
+    display: flex; justify-content: center;
+    flex-wrap: wrap; gap: 12px; padding: 6px;
+  }
+  .frame-selection img {
+    width: 150px; height: 200px;
+    cursor: pointer; border-radius: 14px;
+    border: 3px solid transparent;
+    background: white; object-fit: contain;
+    transition: .2s;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.09);
+  }
+  .frame-selection img.selected {
+    border-color: var(--pink);
+    transform: scale(1.06);
+    box-shadow: 0 6px 20px rgba(255,107,157,0.4);
+  }
+
+  /* 배경색 선택 (Step1 안에 통합) */
+  .color-section {
+    width: 100%;
+  }
+  .color-section-label {
+    font-size: 16px; font-weight: 700;
+    color: #666; text-align: center;
+    margin-bottom: 8px;
+  }
+  #colorPicker {
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 8px; padding: 10px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 16px;
+    border: 1.5px dashed var(--pink-light);
+  }
+  #colorPicker button {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 3px solid transparent; cursor: pointer; transition: .2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+  }
+  #colorPicker button.selected { border-color: #333; transform: scale(1.2); }
+
+  /* 프레임 미리보기 */
+  .frame-preview-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+  .frame-preview-label { font-size: 13px; color: #aaa; }
+  #framePreviewCanvas {
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+    background: white; display: block;
+  }
+
+  /* ── 스티커 ── */
+  .sticker-selection {
+    display: flex; justify-content: center;
+    flex-wrap: wrap; gap: 8px; padding: 8px;
+  }
+  .sticker-thumb {
+    width: 58px; height: 58px; cursor: grab;
+    border-radius: 12px; border: 2px solid #eee;
+    background: white; object-fit: contain; transition: .2s;
+  }
+  .sticker-thumb.sticker-selected {
+    border: 3px solid var(--pink); transform: scale(1.15);
+    box-shadow: 0 0 8px #ff9ecf;
+  }
+  #stickerHint { text-align: center; font-size: 14px; color: var(--pink); margin: 6px 0; min-height: 20px; }
+
+  /* ── Step3: 가로 레이아웃 (입력 + 미니 프리뷰) ── */
+  .step3-layout {
+    display: flex; align-items: flex-start;
+    justify-content: center; gap: 28px;
+    flex-wrap: wrap; margin: 14px 0;
+  }
+  .step3-inputs {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  .step3-inputs input {
+    padding: 10px 16px; border-radius: 14px;
+    font-family: 'Gaegu', cursive; font-size: 18px;
+    width: 220px; text-align: center;
+    border: 2px solid #f0d6e8; background: white;
+    outline: none; transition: border-color .2s;
+  }
+  .step3-inputs input:focus { border-color: var(--pink); }
+  .step3-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .step3-preview-label { font-size: 13px; color: #aaa; }
+  #textPreviewCanvas { border-radius: 14px; box-shadow: 0 3px 14px rgba(0,0,0,0.13); background: white; display: block; }
+
+  /* ── 캔버스 영역 (step2) ── */
+  #canvasWrapper { display: flex; justify-content: center; margin: 8px auto; }
+  #canvasWrapperInner { position: relative; display: inline-block; }
+  #resultCanvas {
+    display: block; border-radius: 20px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.15);
+    background: white; max-width: 100%;
+  }
+
+  /* 플로팅 버튼 */
+  #floatingStartBtn, #floatingCaptureBtn {
+    position: absolute; width: 58px; height: 58px;
+    border-radius: 50%; border: none; color: white; font-size: 22px;
+    cursor: pointer; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.25); transition: .2s;
+  }
+  #floatingStartBtn  { background: #6bc5ff; }
+  #floatingCaptureBtn{ background: var(--pink); }
+  #floatingStartBtn:hover, #floatingCaptureBtn:hover { transform: scale(1.1); }
+
+  /* ── 카메라 컨트롤 ── */
+  #cameraControls {
+    display: none; justify-content: center;
+    gap: 10px; margin: 10px auto; flex-wrap: wrap;
+  }
+  .cam-btn {
+    font-family: 'Gaegu', cursive; font-size: 16px; padding: 10px 18px;
+    border-radius: 50px; border: none; color: white; cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12); transition: .2s;
+  }
+  .cam-btn:hover { opacity: .85; transform: translateY(-2px); }
+  #flipBtn     { background: #a78bfa; }
+  #undoBtnCam  { background: var(--purple); }
+  #clearBtnCam { background: var(--orange); }
+
+  /* ── 사진 카운터 배지 ── */
+  #photoCountBadge {
+    text-align: center;
+    font-size: 17px; font-weight: 700;
+    color: var(--pink); margin: 6px 0;
+  }
+
+  /* ── 저장 영역 (step4) ── */
+  .save-area {
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 10px; margin: 16px 0;
+  }
+  .save-area button {
+    font-family: 'Gaegu', cursive; font-size: 17px;
+    padding: 11px 20px; border-radius: 14px;
+    border: none; cursor: pointer; color: white;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12); transition: .2s;
+  }
+  .save-area button:hover { opacity: .85; transform: translateY(-2px); }
+  .btn-save          { background: var(--blue); }
+  .btn-clear-sticker { background: var(--orange); }
+
+  /* ── 미리보기 (step4) ── */
+  #previewWrapper { display: flex; justify-content: center; margin-bottom: 10px; }
+  #previewCanvas {
+    display: block; border-radius: 20px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.15);
+    background: white; max-width: 100%;
+  }
+
+  #canvas { display: none; }
+
+  /* ── 네비게이션 버튼 ── */
+  .nav-buttons { display: flex; justify-content: center; gap: 14px; margin-top: 22px; }
+  .btn-nav {
+    font-family: 'Gaegu', cursive; font-size: 18px; padding: 12px 30px;
+    border-radius: 50px; border: none; cursor: pointer; font-weight: 700;
+    transition: .2s; box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+  }
+  .btn-prev { background: white; color: #888; border: 2px solid #ddd; }
+  .btn-next { background: linear-gradient(135deg, var(--pink), #c77dff); color: white; }
+  .btn-exit { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+  .btn-nav:hover { transform: translateY(-2px); }
+  .btn-nav:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  /* ── 경고 토스트 ── */
+  #toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: rgba(30,30,30,0.92); color: white;
+    padding: 14px 26px; border-radius: 50px;
+    font-size: 18px; font-family: 'Gaegu', cursive;
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s, transform .3s;
+    z-index: 999; white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #toast.show {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<header>📸 HY_photo_Booth</header>
+<div class="step-indicator" id="stepIndicator"></div>
+
+<!-- ===== STEP 1: 프레임 + 배경색 ===== -->
+<div class="page active" id="page1">
+  <div class="section-title">🎀 프레임 & 배경색 고르기</div>
+  <div class="hint-box">원하는 프레임과 배경 색을 선택하면 오른쪽 미리보기에서 바로 확인할 수 있어요!</div>
+
+  <div class="step1-layout">
+    <!-- 왼쪽: 썸네일 + 배경색 -->
+    <div class="step1-left">
+      <div id="frameSelection" class="frame-selection"></div>
+
+      <div class="color-section">
+        <div class="color-section-label">🎨 배경 색 고르기</div>
+        <div id="colorPicker">
+          <button data-color="#ffffff" style="background:#ffffff"></button>
+          <button data-color="#ffd1dc" style="background:#ffd1dc"></button>
+          <button data-color="#ffdac1" style="background:#ffdac1"></button>
+          <button data-color="#e2f0cb" style="background:#e2f0cb"></button>
+          <button data-color="#c7ceea" style="background:#c7ceea"></button>
+          <button data-color="#b5ead7" style="background:#b5ead7"></button>
+          <button data-color="#d5f4ff" style="background:#d5f4ff"></button>
+          <button data-color="#ff4d6d" style="background:#ff4d6d"></button>
+          <button data-color="#ff9f1c" style="background:#ff9f1c"></button>
+          <button data-color="#ffea00" style="background:#ffea00"></button>
+          <button data-color="#2ec4b6" style="background:#2ec4b6"></button>
+          <button data-color="#4361ee" style="background:#4361ee"></button>
+          <button data-color="#7209b7" style="background:#7209b7"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 프레임+배경 통합 미리보기 캔버스 -->
+    <div class="frame-preview-wrap">
+      <div class="frame-preview-label">📋 미리보기</div>
+      <canvas id="framePreviewCanvas"></canvas>
+    </div>
+  </div>
+
+  <div class="nav-buttons">
+    <button class="btn-nav btn-prev" disabled>◀ 이전</button>
+    <button class="btn-nav btn-next" onclick="goTo(2)">다음 ▶</button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: 사진 찍기 ===== -->
+<div class="page" id="page2">
+  <div class="section-title">📷 사진 찍기</div>
+  <div class="hint-box">🎥 파란 버튼으로 카메라를 시작하고 📸 버튼으로 촬영하세요!</div>
+  <div id="photoCountBadge">📷 0 / 4 장 촬영</div>
+
+  <div id="cameraControls">
+    <button id="flipBtn"     class="cam-btn">🔄 카메라 전환</button>
+    <button id="undoBtnCam"  class="cam-btn" onclick="undoPhoto()">↩️ 한 장 지우기</button>
+    <button id="clearBtnCam" class="cam-btn" onclick="clearPhotos()">🗑️ 사진 모두 지우기</button>
+  </div>
+
+  <div id="canvasWrapper">
+    <div id="canvasWrapperInner">
+      <canvas id="resultCanvas"></canvas>
+      <button id="floatingStartBtn" title="카메라 시작">🎥</button>
+      <button id="floatingCaptureBtn" title="촬영하기">📸</button>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <div class="nav-buttons">
+    <button class="btn-nav btn-prev" onclick="goTo(1)">◀ 이전</button>
+    <button class="btn-nav btn-next" onclick="tryGoStep3()">다음 ▶</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: 문구 & 날짜 ===== -->
+<div class="page" id="page3">
+  <div class="section-title">✏️ 문구 & 날짜 입력</div>
+  <div class="hint-box">사진 아래에 넣을 문구와 날짜를 입력해주세요 💕 오른쪽 미리보기에서 위치를 확인하세요!</div>
+
+  <div class="step3-layout">
+    <div class="step3-inputs">
+      <input id="text1"     placeholder="첫 번째 줄 💕" autocomplete="off">
+      <input id="text2"     placeholder="두 번째 줄 💕" autocomplete="off">
+      <input id="dateInput" placeholder="날짜" autocomplete="off">
+    </div>
+    <div class="step3-preview-wrap">
+      <div class="step3-preview-label">📋 미리보기</div>
+      <canvas id="textPreviewCanvas"></canvas>
+    </div>
+  </div>
+
+  <div class="nav-buttons">
+    <button class="btn-nav btn-prev" onclick="goTo(2)">◀ 이전</button>
+    <button class="btn-nav btn-next" onclick="goTo(4)">다음 ▶</button>
+  </div>
+</div>
+
+<!-- ===== STEP 4: 스티커 & 저장 ===== -->
+<div class="page" id="page4">
+  <div class="section-title">✨ 스티커 꾸미고 저장하기</div>
+  <div id="stickerHint" class="hint-box">스티커를 드래그하거나 탭해서 사진 위에 붙여보세요! 더블탭/더블클릭으로 삭제</div>
+
+  <div id="stickerSelection" class="sticker-selection"></div>
+
+  <div id="previewWrapper">
+    <canvas id="previewCanvas"></canvas>
+  </div>
+
+  <div class="save-area">
+    <button class="btn-save"          onclick="saveImage()">💾 저장하기</button>
+    <button class="btn-clear-sticker" onclick="clearStickers()">🧹 스티커 초기화</button>
+  </div>
+
+  <div class="nav-buttons">
+    <button class="btn-nav btn-prev" onclick="goTo(3)">◀ 이전</button>
+    <button class="btn-nav btn-exit" onclick="exitBooth()">🚪 나가기</button>
+  </div>
+</div>
+
+<!-- 토스트 메시지 -->
+<div id="toast"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  // ── 설정 ──
+  const frameSources   = ["frame1.png","frame2.png","frame3.png","frame4.png","frame5.png","frame6.png","frame7.png","frame8.png"];
+  const stickerSources = ["sticker1.png","sticker2.png","sticker3.png","sticker4.png","sticker5.png","sticker6.png","sticker7.png","sticker8.png","sticker9.png","sticker10.png","sticker11.png","sticker12.png","sticker13.png","sticker14.png","sticker15.png","sticker16.png","sticker17.png","sticker18.png","sticker19.png","sticker20.png","sticker21.png","sticker22.png","sticker23.png","sticker24.png"];
+  const shutterSoundFile = "shutter.mp3";
+  const STEPS = ["프레임·배경색", "사진찍기", "문구·날짜", "꾸미기·저장"];
+
+  let currentStep = 1;
+
+  // ── 스텝 인디케이터 ──
+  const indEl = document.getElementById("stepIndicator");
+  STEPS.forEach((label, idx) => {
+    const dot = document.createElement("div");
+    dot.className = "step-dot";
+    dot.innerHTML = `<div class="step-circle" id="sc${idx+1}">${idx+1}</div><div class="step-label" id="sl${idx+1}">${label}</div>`;
+    indEl.appendChild(dot);
+    if (idx < STEPS.length - 1) {
+      const line = document.createElement("div");
+      line.className = "step-line";
+      line.id = `line${idx+1}`;
+      indEl.appendChild(line);
+    }
+  });
+
+  function updateIndicator(step) {
+    STEPS.forEach((_, idx) => {
+      const n = idx + 1;
+      const circ  = document.getElementById(`sc${n}`);
+      const label = document.getElementById(`sl${n}`);
+      const line  = document.getElementById(`line${n}`);
+      circ.className  = "step-circle"  + (n < step ? " done" : n === step ? " active" : "");
+      label.className = "step-label"   + (n < step ? " done" : n === step ? " active" : "");
+      if (line) line.className = "step-line" + (n < step ? " done" : "");
+    });
+  }
+  updateIndicator(1);
+
+  window.goTo = (step) => {
+    document.getElementById(`page${currentStep}`).classList.remove("active");
+    currentStep = step;
+    document.getElementById(`page${step}`).classList.add("active");
+    updateIndicator(step);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (step === 1) syncFramePreview();
+    if (step === 3) syncTextPreview();
+    if (step === 4) syncPreview();
+  };
+
+  // ── 토스트 메시지 ──
+  let toastTimer = null;
+  function showToast(msg) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
+  }
+
+  // ── Step2 다음 버튼 가드 ──
+  window.tryGoStep3 = () => {
+    if (!video.srcObject) {
+      showToast("🎥 파란 버튼을 눌러 카메라를 먼저 시작해주세요!");
+      return;
+    }
+    if (photos.length < TOTAL) {
+      const remaining = TOTAL - photos.length;
+      showToast(`📸 사진이 ${remaining}장 부족해요! 4장을 모두 찍어야 해요 🙏`);
+      return;
+    }
+    goTo(3);
+  };
+
+  // ── 나가기 ──
+  window.exitBooth = () => {
+    if (confirm("포토부스를 나가시겠어요? 저장하지 않은 내용은 사라져요 🥲")) {
+      window.close();
+      setTimeout(() => { window.location.href = "about:blank"; }, 200);
+    }
+  };
+
+  // ── 캔버스 & 상태 ──
+  const isMobile = () => window.matchMedia("(pointer: coarse)").matches;
+
+  const video = document.createElement("video");
+  video.autoplay = true; video.playsInline = true;
+
+  const canvas            = document.getElementById("canvas");
+  const resultCanvas      = document.getElementById("resultCanvas");
+  const previewCanvas     = document.getElementById("previewCanvas");
+  const textPreviewCanvas = document.getElementById("textPreviewCanvas");
+  const framePreviewCanvas= document.getElementById("framePreviewCanvas");
+
+  const ctx    = resultCanvas.getContext("2d");
+  const pCtx   = previewCanvas.getContext("2d");
+  const tpCtx  = textPreviewCanvas.getContext("2d");
+  const fpCtx  = framePreviewCanvas.getContext("2d");
+
+  const startBtn       = document.getElementById("floatingStartBtn");
+  const captureBtn     = document.getElementById("floatingCaptureBtn");
+  const flipBtn        = document.getElementById("flipBtn");
+  const cameraControls = document.getElementById("cameraControls");
+  const photoCountBadge= document.getElementById("photoCountBadge");
+
+  const PHOTO_W = 300, PHOTO_H = 400, TOTAL = 4, GAP = 20, SIDE = 30, BOTTOM = 200;
+
+  resultCanvas.width   = PHOTO_W + SIDE * 2;
+  resultCanvas.height  = PHOTO_H * TOTAL + GAP * (TOTAL + 1) + BOTTOM;
+  previewCanvas.width  = resultCanvas.width;
+  previewCanvas.height = resultCanvas.height;
+
+  // textPreviewCanvas: 전체를 170px 너비로 축소
+  const TP_W = 170;
+  const TP_H = Math.round(resultCanvas.height * (TP_W / resultCanvas.width));
+  textPreviewCanvas.width  = TP_W;
+  textPreviewCanvas.height = TP_H;
+  textPreviewCanvas.style.width  = TP_W + "px";
+  textPreviewCanvas.style.height = TP_H + "px";
+
+  // framePreviewCanvas: 200px 너비로 축소
+  const FP_W = 200;
+  const FP_H = Math.round(resultCanvas.height * (FP_W / resultCanvas.width));
+  framePreviewCanvas.width  = FP_W;
+  framePreviewCanvas.height = FP_H;
+  framePreviewCanvas.style.width  = FP_W + "px";
+  framePreviewCanvas.style.height = FP_H + "px";
+
+  let photos = [], photoImages = [];
+  let selectedFrame = null;
+  let bgColor = "#ffffff";
+  let count = 0, countTimer = null;
+  const availableStickers = [];
+  let placedStickers = [[],[],[],[]];
+  let currentFacingMode = "user";
+  let selectedStickerIndex = null;
+
+  let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
+  let blockNextClick = false;
+  let clickTimer = null;
+
+  // ── 셔터음 ──
+  let audioContext = null, shutterBuffer = null;
+  async function loadShutterSound() {
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const r = await fetch(shutterSoundFile);
+      const ab = await r.arrayBuffer();
+      shutterBuffer = await audioContext.decodeAudioData(ab);
+    } catch(e) {}
+  }
+  function resumeAudio() { if (audioContext && audioContext.state === "suspended") audioContext.resume(); }
+  document.addEventListener("click", resumeAudio);
+  document.addEventListener("touchstart", resumeAudio);
+  function scheduleShutter(delaySec) {
+    if (!audioContext || !shutterBuffer) {
+      setTimeout(() => { const f = new Audio(shutterSoundFile); f.play().catch(()=>{}); }, delaySec*1000);
+      return;
+    }
+    if (audioContext.state === "suspended") audioContext.resume();
+    const src = audioContext.createBufferSource();
+    src.buffer = shutterBuffer;
+    src.connect(audioContext.destination);
+    src.start(audioContext.currentTime + delaySec);
+  }
+  loadShutterSound();
+
+  // ── 폰트 ──
+  async function loadFont() {
+    try {
+      await document.fonts.load("26px Gaegu");
+      await document.fonts.load("bold 100px Gaegu");
+      await document.fonts.load("20px Gaegu");
+    } catch(e) {}
+  }
+  loadFont().then(() => { redraw(); syncPreview(); syncTextPreview(); syncFramePreview(); });
+
+  // ── 텍스트 입력 ──
+  const text1     = document.getElementById("text1");
+  const text2     = document.getElementById("text2");
+  const dateInput = document.getElementById("dateInput");
+
+  const setTodayDate = () => {
+    const t = new Date();
+    dateInput.value = t.getFullYear() + "." + String(t.getMonth()+1).padStart(2,"0") + "." + String(t.getDate()).padStart(2,"0");
+  };
+  setTodayDate();
+
+  text1.addEventListener("input",     () => { redraw(); syncPreview(); syncTextPreview(); });
+  text2.addEventListener("input",     () => { redraw(); syncPreview(); syncTextPreview(); });
+  dateInput.addEventListener("input", () => { redraw(); syncPreview(); syncTextPreview(); });
+
+  // ── 카메라 ──
+  async function startCamera(facingMode) {
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
+      video.srcObject = stream;
+      currentFacingMode = facingMode;
+      redraw();
+    } catch(err) { alert("카메라를 시작할 수 없습니다."); }
+  }
+
+  flipBtn.onclick = () => { if (!video.srcObject) return; startCamera(currentFacingMode === "user" ? "environment" : "user"); };
+
+  startBtn.onclick = async () => {
+    if (!selectedFrame) return showToast("🎀 먼저 Step 1에서 프레임을 선택해주세요!");
+    await startCamera(currentFacingMode);
+  };
+
+  captureBtn.onclick = () => {
+    if (photos.length >= TOTAL || count > 0) return;
+    count = 3;
+    scheduleShutter(3);
+    redraw();
+    countTimer = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        clearInterval(countTimer);
+        count = 0;
+        canvas.width = PHOTO_W; canvas.height = PHOTO_H;
+        const cCtx = canvas.getContext("2d");
+        cCtx.translate(PHOTO_W, 0);
+        cCtx.scale(-1, 1);
+        cCtx.drawImage(video, 0, 0, PHOTO_W, PHOTO_H);
+        const dataURL = canvas.toDataURL();
+        const img = new Image();
+        img.onload = () => {
+          photoImages.push(img);
+          photos.push(dataURL);
+          updatePhotoBadge();
+          redraw(); syncPreview();
+        };
+        img.src = dataURL;
+      }
+      redraw();
+    }, 1000);
+  };
+
+  function updatePhotoBadge() {
+    photoCountBadge.textContent = `📷 ${photos.length} / ${TOTAL} 장 촬영`;
+  }
+
+  // ── 프레임 로드 ──
+  frameSources.forEach(src => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      const thumb = document.createElement("img");
+      thumb.src = src;
+      thumb.onclick = () => {
+        selectedFrame = img;
+        document.querySelectorAll(".frame-selection img").forEach(el => el.classList.remove("selected"));
+        thumb.classList.add("selected");
+        redraw(); syncPreview(); syncTextPreview(); syncFramePreview();
+      };
+      document.getElementById("frameSelection").appendChild(thumb);
+    };
+  });
+
+  // ── 색상 선택 ──
+  document.querySelectorAll("#colorPicker button").forEach(btn => {
+    btn.onclick = () => {
+      bgColor = btn.dataset.color;
+      document.querySelectorAll("#colorPicker button").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      redraw(); syncPreview(); syncTextPreview(); syncFramePreview();
+    };
+  });
+
+  // ── 스티커 로드 ──
+  stickerSources.forEach((src, index) => {
+    if (!src) return;
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      availableStickers[index] = img;
+      const thumb = document.createElement("img");
+      thumb.src = src;
+      thumb.className = "sticker-thumb";
+      if (isMobile()) {
+        thumb.addEventListener("click", () => {
+          if (selectedStickerIndex === index) {
+            selectedStickerIndex = null;
+            thumb.classList.remove("sticker-selected");
+          } else {
+            selectedStickerIndex = index;
+            document.querySelectorAll(".sticker-thumb").forEach(el => el.classList.remove("sticker-selected"));
+            thumb.classList.add("sticker-selected");
+          }
+          updateStickerHint();
+        });
+      } else {
+        thumb.draggable = true;
+        thumb.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", index));
+      }
+      document.getElementById("stickerSelection").appendChild(thumb);
+    };
+  });
+
+  function updateStickerHint() {
+    const hint = document.getElementById("stickerHint");
+    hint.textContent = selectedStickerIndex !== null
+      ? "✅ 스티커 선택됨! 사진 위를 탭하면 붙여요 / 더블탭하면 삭제해요"
+      : "스티커를 드래그하거나 탭해서 사진 위에 붙여보세요! 더블탭/더블클릭으로 삭제";
+  }
+
+  // ── 스티커 이벤트 (previewCanvas) ──
+  previewCanvas.addEventListener("dragover", (e) => e.preventDefault());
+  previewCanvas.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const stickerIdx = parseInt(e.dataTransfer.getData("text/plain"));
+    const draggedSticker = availableStickers[stickerIdx];
+    if (!draggedSticker) return;
+    const { canvasX, canvasY } = getCanvasCoords(previewCanvas, e.clientX, e.clientY);
+    placeStickerAt(draggedSticker, canvasX, canvasY);
+  });
+
+  if (isMobile()) {
+    previewCanvas.addEventListener("touchstart", (e) => {
+      const touch = e.touches[0];
+      const { canvasX, canvasY } = getCanvasCoords(previewCanvas, touch.clientX, touch.clientY);
+      const now = Date.now();
+      const dx = canvasX - lastTapX, dy = canvasY - lastTapY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const isDoubleTap = (now - lastTapTime < 400) && dist < 40;
+      if (isDoubleTap) {
+        e.preventDefault();
+        blockNextClick = true;
+        deleteStickerAt(canvasX, canvasY);
+        lastTapTime = 0; lastTapX = 0; lastTapY = 0;
+        return;
+      }
+      lastTapTime = now; lastTapX = canvasX; lastTapY = canvasY;
+    }, { passive: false });
+
+    previewCanvas.addEventListener("click", (e) => {
+      if (blockNextClick) { blockNextClick = false; return; }
+      if (selectedStickerIndex !== null && availableStickers[selectedStickerIndex]) {
+        const { canvasX, canvasY } = getCanvasCoords(previewCanvas, e.clientX, e.clientY);
+        placeStickerAt(availableStickers[selectedStickerIndex], canvasX, canvasY);
+      }
+    });
+  } else {
+    previewCanvas.addEventListener("click", (e) => {
+      const { canvasX, canvasY } = getCanvasCoords(previewCanvas, e.clientX, e.clientY);
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        deleteStickerAt(canvasX, canvasY);
+      } else {
+        clickTimer = setTimeout(() => { clickTimer = null; }, 300);
+      }
+    });
+  }
+
+  function getCanvasCoords(cvs, clientX, clientY) {
+    const rect = cvs.getBoundingClientRect();
+    const scaleX = cvs.width / rect.width;
+    const scaleY = cvs.height / rect.height;
+    return { canvasX: (clientX - rect.left) * scaleX, canvasY: (clientY - rect.top) * scaleY };
+  }
+
+  function placeStickerAt(sticker, canvasX, canvasY) {
+    for (let i = 0; i < TOTAL; i++) {
+      const slotX = SIDE, slotY = GAP + i * (PHOTO_H + GAP);
+      if (canvasX >= slotX && canvasX <= slotX + PHOTO_W && canvasY >= slotY && canvasY <= slotY + PHOTO_H) {
+        const sW = 100, sH = (sticker.height / sticker.width) * sW;
+        placedStickers[i].push({ img: sticker, x: canvasX - slotX - sW/2, y: canvasY - slotY - sH/2, w: sW, h: sH });
+        redraw(); syncPreview();
+        break;
+      }
+    }
+  }
+
+  function deleteStickerAt(canvasX, canvasY) {
+    for (let i = 0; i < TOTAL; i++) {
+      const slotX = SIDE, slotY = GAP + i * (PHOTO_H + GAP);
+      if (canvasX >= slotX && canvasX <= slotX + PHOTO_W && canvasY >= slotY && canvasY <= slotY + PHOTO_H) {
+        const stickers = placedStickers[i];
+        for (let j = stickers.length - 1; j >= 0; j--) {
+          const s = stickers[j];
+          if (canvasX >= slotX+s.x && canvasX <= slotX+s.x+s.w && canvasY >= slotY+s.y && canvasY <= slotY+s.y+s.h) {
+            stickers.splice(j, 1);
+            redraw(); syncPreview();
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  // ── 공통 그리기 ──
+  function drawToContext(targetCtx, targetCanvas, showLive) {
+    targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    targetCtx.fillStyle = bgColor;
+    targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+
+    for (let i = 0; i < TOTAL; i++) {
+      const dx = SIDE, dy = GAP + i * (PHOTO_H + GAP);
+      if (photoImages[i]) {
+        targetCtx.drawImage(photoImages[i], dx, dy, PHOTO_W, PHOTO_H);
+      } else if (showLive && i === photos.length && video.srcObject) {
+        targetCtx.save();
+        targetCtx.translate(dx + PHOTO_W, dy);
+        targetCtx.scale(-1, 1);
+        targetCtx.drawImage(video, 0, 0, PHOTO_W, PHOTO_H);
+        targetCtx.restore();
+        if (count > 0) {
+          targetCtx.fillStyle = "rgba(0,0,0,0.4)";
+          targetCtx.fillRect(dx, dy, PHOTO_W, PHOTO_H);
+          targetCtx.fillStyle = "#fff";
+          targetCtx.font = "bold 100px Gaegu, cursive";
+          targetCtx.textAlign = "center";
+          targetCtx.fillText(count, dx + PHOTO_W/2, dy + PHOTO_H/2 + 30);
+        }
+      } else {
+        targetCtx.fillStyle = "#eee";
+        targetCtx.fillRect(dx, dy, PHOTO_W, PHOTO_H);
+      }
+      placedStickers[i].forEach(s => targetCtx.drawImage(s.img, dx+s.x, dy+s.y, s.w, s.h));
+    }
+
+    if (selectedFrame) {
+      targetCtx.drawImage(selectedFrame,
+        (targetCanvas.width  - selectedFrame.width)  / 2,
+        (targetCanvas.height - selectedFrame.height) / 2);
+    }
+
+    targetCtx.fillStyle = "#000";
+    targetCtx.textAlign = "center";
+    targetCtx.font = "26px Gaegu, cursive";
+    targetCtx.fillText(text1.value,     targetCanvas.width/2, targetCanvas.height - 180);
+    targetCtx.fillText(text2.value,     targetCanvas.width/2, targetCanvas.height - 145);
+    targetCtx.font = "20px Gaegu, cursive";
+    targetCtx.fillText(dateInput.value, targetCanvas.width/2, targetCanvas.height - 110);
+  }
+
+  // 오프스크린으로 풀사이즈 렌더 후 축소 복사
+  function renderScaled(targetCtx, targetCanvas) {
+    const off = document.createElement("canvas");
+    off.width  = resultCanvas.width;
+    off.height = resultCanvas.height;
+    const offCtx = off.getContext("2d");
+    drawToContext(offCtx, off, false);
+    targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    targetCtx.drawImage(off, 0, 0, targetCanvas.width, targetCanvas.height);
+  }
+
+  function syncTextPreview()  { renderScaled(tpCtx, textPreviewCanvas); }
+  function syncFramePreview() { renderScaled(fpCtx, framePreviewCanvas); }
+
+  function redraw() {
+    drawToContext(ctx, resultCanvas, true);
+    updateButtons();
+    if (video.srcObject && photos.length < TOTAL) requestAnimationFrame(redraw);
+  }
+
+  function syncPreview() {
+    drawToContext(pCtx, previewCanvas, false);
+  }
+
+  function updateButtons() {
+    if (!video.srcObject) {
+      startBtn.style.display = "block";
+      startBtn.style.left = (SIDE + 20) + "px";
+      startBtn.style.top  = (GAP + PHOTO_H - 80) + "px";
+      captureBtn.style.display = "none";
+      cameraControls.style.display = "none";
+    } else {
+      startBtn.style.display = "none";
+      captureBtn.style.display = (photos.length < TOTAL && count === 0) ? "block" : "none";
+      captureBtn.style.left = (SIDE + PHOTO_W - 80) + "px";
+      captureBtn.style.top  = (GAP + photos.length * (PHOTO_H + GAP) + PHOTO_H - 80) + "px";
+      cameraControls.style.display = "flex";
+    }
+  }
+
+  // ── 전역 버튼 함수 ──
+  window.saveImage = () => {
+    syncPreview();
+    const link = document.createElement("a");
+    link.download = "hyeyum_photo.png";
+    link.href = previewCanvas.toDataURL();
+    link.click();
+  };
+
+  window.undoPhoto = () => {
+    if (count > 0) { count = 0; if (countTimer) clearInterval(countTimer); }
+    else if (photos.length > 0) { photos.pop(); photoImages.pop(); }
+    updatePhotoBadge();
+    redraw(); syncPreview();
+  };
+
+  window.clearPhotos = () => {
+    if (confirm("찍은 사진을 모두 지울까요?")) {
+      photos = []; photoImages = []; count = 0;
+      if (countTimer) clearInterval(countTimer);
+      updatePhotoBadge();
+      redraw(); syncPreview();
+    }
+  };
+
+  // 스티커만 초기화
+  window.clearStickers = () => {
+    if (confirm("붙인 스티커를 모두 지울까요?")) {
+      placedStickers = [[],[],[],[]];
+      selectedStickerIndex = null;
+      document.querySelectorAll(".sticker-thumb").forEach(el => el.classList.remove("sticker-selected"));
+      updateStickerHint();
+      redraw(); syncPreview();
+    }
+  };
+
+  redraw();
+  syncPreview();
+  syncTextPreview();
+  syncFramePreview();
+  updatePhotoBadge();
+});
+</script>
+</body>
+</html>
